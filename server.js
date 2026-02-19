@@ -23,9 +23,14 @@ app.use(cors({
 app.use(express.json());
 
 // Configuración Braze
-const BRAZE_API_KEY = process.env.BRAZE_API_KEY || '4d028eac-8cfd-4fef-94b1-229cf3e84d0c';
-const BRAZE_INSTANCE_URL = process.env.BRAZE_INSTANCE_URL || 'https://rest.iad-05.braze.com';
+const BRAZE_API_KEY = process.env.BRAZE_API_KEY;
+const BRAZE_INSTANCE_URL = process.env.BRAZE_INSTANCE_URL;
 
+// Validar que las variables existen
+if (!BRAZE_API_KEY || !BRAZE_INSTANCE_URL) {
+    console.error('❌ Error: Faltan variables de entorno BRAZE_API_KEY o BRAZE_INSTANCE_URL');
+    process.exit(1); // Detiene el servidor si faltan variables críticas
+}
 // Endpoint para guardar preferencias
 app.post('/api/save-preferences/:userId', async (req, res) => {
     // Headers CORS
