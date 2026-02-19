@@ -1,3 +1,31 @@
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const helmet = require('helmet');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+// Configuración de seguridad
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+}));
+
+// CORS
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(express.json());
+
+// Configuración Braze
+const BRAZE_API_KEY = process.env.BRAZE_API_KEY || '4d028eac-8cfd-4fef-94b1-229cf3e84d0c';
+const BRAZE_INSTANCE_URL = process.env.BRAZE_INSTANCE_URL || 'https://rest.iad-05.braze.com';
+
 // Endpoint para guardar preferencias
 app.post('/api/save-preferences/:userId', async (req, res) => {
     // Headers CORS
@@ -91,6 +119,62 @@ app.post('/api/save-preferences/:userId', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error en el endpoint:', error);
-        // ... resto del manejo de errores
+        
+        const errorResponse = {
+            success: false,
+            error: 'Error interno del servidor',
+            timestamp: new Date().toISOString()
+        };
+
+        if (error.response) {
+            errorResponse.brazeError = {
+                status: error.response.status,
+                data: error.response.data
+            };
+            console.error('Error de Braze API:', error.response.status, error.response.data);
+        } else if (error.request) {
+            errorResponse.error = 'No se pudo conectar con Braze';
+            console.error('No hubo respuesta de Braze');
+        } else {
+            errorResponse.error = error.message;
+        }
+
+        return res.status(500).json(errorResponse);
     }
+});
+
+// Manejar preflight requests
+app.options('/api/save-preferences/:userId', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+});
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        braze_configured: true,
+        braze_instance: BRAZE_INSTANCE_URL
+    });
+});
+
+// Ruta raíz
+app.get('/', (req, res) => {
+    res.json({
+        message: 'API de Notificaciones de Gol',
+        endpoints: {
+            health: '/health',
+            savePreferences: '/api/save-preferences/:userId (POST)'
+        },
+        braze_status: 'conectado'
+    });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📍 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔌 Conectado a Braze: ${BRAZE_INSTANCE_URL}`);
 });
